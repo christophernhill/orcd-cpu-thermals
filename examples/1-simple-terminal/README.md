@@ -26,7 +26,7 @@ Pick the script that matches what you want and run it. Each is two or three line
 | [`record-headless.sh`](record-headless.sh)             | Silent capture: CSV to file, no TUI. SSH / cron friendly.| `cpu-thermals --csv --no-tui` |
 | [`stream-csv-to-stdout.sh`](stream-csv-to-stdout.sh)   | Stream CSV to stdout for pipes. TUI auto-suppressed.     | `cpu-thermals --csv -` |
 
-Each script forwards extra flags through, so `./watch-fast.sh --backend lm-sensors` or `./watch-and-record.sh ~/cpu.csv` work as expected.
+Each script forwards extra arguments through, so `./watch.sh 5` (refresh every 5 s) or `./watch-and-record.sh ~/cpu.csv` (record to a chosen path) work as expected.
 
 Run any of them like this:
 
