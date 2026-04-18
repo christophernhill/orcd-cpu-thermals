@@ -99,18 +99,25 @@ ok "explicit --no-tui silences the auto-suppress note"
 
 section "examples/ shell scripts"
 
-bash -n examples/2-mprime-stress/run.sh \
-    || fail "run.sh has a bash syntax error"
-bash -n examples/3-systemd-csv-rotation/install.sh \
-    || fail "install.sh has a bash syntax error"
-ok "shell scripts pass bash -n"
+# Glob all *.sh anywhere under examples/ so new scripts get covered
+# automatically without having to update this file. (Avoids `mapfile`,
+# which is bash 4+ -- macOS ships /bin/bash 3.2.)
+example_scripts=()
+while IFS= read -r s; do
+    example_scripts+=("$s")
+done < <(find examples -type f -name '*.sh' | sort)
+[[ "${#example_scripts[@]}" -gt 0 ]] || fail "no shell scripts found under examples/"
+
+for s in "${example_scripts[@]}"; do
+    bash -n "$s" || fail "$s has a bash syntax error"
+done
+ok "${#example_scripts[@]} shell scripts pass bash -n"
 
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck examples/2-mprime-stress/run.sh \
-        || fail "shellcheck on run.sh"
-    shellcheck examples/3-systemd-csv-rotation/install.sh \
-        || fail "shellcheck on install.sh"
-    ok "shell scripts pass shellcheck"
+    for s in "${example_scripts[@]}"; do
+        shellcheck "$s" || fail "shellcheck on $s"
+    done
+    ok "${#example_scripts[@]} shell scripts pass shellcheck"
 else
     ok "shellcheck not installed (skipping)"
 fi

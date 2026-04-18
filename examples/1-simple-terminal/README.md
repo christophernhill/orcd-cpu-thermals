@@ -1,6 +1,6 @@
 # Example 1 — simple terminal run
 
-A 30-second walkthrough of `cpu-thermals` running in your terminal with the live colored bar-graph display. No scripts, no setup beyond installing the tool. Start here if you've never used `cpu-thermals` before.
+A 30-second walkthrough of `cpu-thermals` running in your terminal with the live colored bar-graph display. Five tiny named scripts let you try each common invocation without copy-pasting from this file. Start here if you've never used `cpu-thermals` before.
 
 ## What this shows
 
@@ -16,23 +16,34 @@ The default behavior of `cpu-thermals`: a refreshing two-column table of CPU tem
 
 ## How to run
 
-The default invocation:
+Pick the script that matches what you want and run it. Each is two or three lines so you can `cat` it to see exactly what it invokes.
+
+| Script | What it does | Underlying command |
+| ------ | ------------ | ------------------ |
+| [`watch.sh`](watch.sh)                                 | Default: live colored TUI table, 2-second refresh.       | `cpu-thermals` |
+| [`watch-fast.sh`](watch-fast.sh)                       | Same TUI, refreshes twice per second.                    | `cpu-thermals 0.5` |
+| [`watch-and-record.sh`](watch-and-record.sh)           | TUI **and** record CSV to an auto-named file in CWD.     | `cpu-thermals --csv` |
+| [`record-headless.sh`](record-headless.sh)             | Silent capture: CSV to file, no TUI. SSH / cron friendly.| `cpu-thermals --csv --no-tui` |
+| [`stream-csv-to-stdout.sh`](stream-csv-to-stdout.sh)   | Stream CSV to stdout for pipes. TUI auto-suppressed.     | `cpu-thermals --csv -` |
+
+Each script forwards extra flags through, so `./watch-fast.sh --backend lm-sensors` or `./watch-and-record.sh ~/cpu.csv` work as expected.
+
+Run any of them like this:
 
 ```bash
-cpu-thermals
+cd examples/1-simple-terminal
+./watch.sh                          # the most common starting point
+./watch-and-record.sh               # also leaves a cpu_thermals-<host>-<ts>.csv file
+./stream-csv-to-stdout.sh | head    # try the pipe variant
 ```
 
-A few useful variants:
+Press **Ctrl-C** to exit any of them.
+
+For everything `cpu-thermals` accepts, including options none of the above scripts use:
 
 ```bash
-cpu-thermals 0.5                 # refresh twice a second
-cpu-thermals --csv               # also record CSV to an auto-named file in CWD
-cpu-thermals --csv --no-tui      # silent capture (cron / SSH friendly)
-cpu-thermals --csv -             # CSV to stdout, e.g. for piping
-cpu-thermals --help              # all options + more examples
+cpu-thermals --help
 ```
-
-Press **Ctrl-C** to exit.
 
 ## What you should see
 
