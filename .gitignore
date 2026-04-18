@@ -1,7 +1,12 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+build/
+dist/
 .venv/
 venv/
 .env
 .DS_Store
+
+# CSV captures (default --csv filename pattern)
+cpu_thermals-*.csv

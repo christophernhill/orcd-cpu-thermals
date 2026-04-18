@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cpu_thermals"
+version = "0.1.0"
+description = "Live CPU temperature monitor for Linux (Intel + AMD) and macOS Apple Silicon"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "cnh" }]
+keywords = ["cpu", "temperature", "thermals", "lm-sensors", "monitoring", "linux"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Monitoring",
+]
+dependencies = []
+
+[project.scripts]
+cpu-thermals = "cpu_thermals.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cpu_thermals*"]
