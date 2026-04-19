@@ -8,5 +8,8 @@ venv/
 .env
 .DS_Store
 
+# Working directory for reviews
+reviews
+
 # CSV captures (default --csv filename pattern)
 cpu_thermals-*.csv
