@@ -1,0 +1,63 @@
+Bootstrap: docker
+From: alpine:3.19
+
+%files
+    cpu_thermals /opt/cpu_thermals/cpu_thermals
+    pyproject.toml /opt/cpu_thermals/pyproject.toml
+    README.md /opt/cpu_thermals/README.md
+
+%post
+    apk add --no-cache python3 py3-pip lm-sensors
+    cd /opt/cpu_thermals
+    # --break-system-packages because Alpine's Python is marked PEP 668
+    # externally-managed; this is the standard pattern for installing a
+    # single first-party package into a container.
+    python3 -m pip install --no-cache-dir --break-system-packages .
+    # Drop the source tree to slim the image; the installed package is
+    # already in site-packages and the entry point is on PATH.
+    rm -rf /opt/cpu_thermals
+
+%environment
+    export PATH=/usr/local/bin:/usr/bin:$PATH
+
+%runscript
+    exec cpu-thermals "$@"
+
+%labels
+    Author cnh
+    Project cpu_thermals
+    Version 0.1.0
+    Description Live CPU temperature monitor (Linux backend via lm-sensors)
+
+%help
+    Live CPU temperature monitor packaged for Apptainer.
+
+    Build:  ./build.sh
+    Run:    ./run.sh                  # default 2-second TUI table
+            ./run.sh 0.5              # twice-per-second refresh
+            ./run.sh --csv ~/cpu.csv  # also record CSV to a host-visible path
+            ./run.sh --csv -          # stream CSV to stdout (TUI auto-suppressed)
+
+    What this image carries:
+        python3, the cpu_thermals package, and the lm-sensors userspace
+        binary + libsensors. No userspace tooling needs to be installed
+        on the host -- everything cpu-thermals talks to is in here.
+
+    What the host must provide:
+        1. A Linux kernel (any recent version; hwmon has been in-tree
+           since 2.6.x).
+        2. The right hwmon driver module loaded for your CPU. On modern
+           distros this is automatic via udev:
+               Intel  -> coretemp
+               AMD    -> k10temp
+           If you don't see /sys/class/hwmon/hwmon*/name reporting one
+           of these, load the module manually as root:
+               sudo modprobe coretemp     # or k10temp on AMD
+        3. Apptainer 1.x (or legacy Singularity 3.x) on PATH.
+
+    Verify the host is ready (no install required):
+        ls /sys/class/hwmon/
+        cat /sys/class/hwmon/hwmon*/name      # must include coretemp or k10temp
+
+    Apptainer auto-mounts /sys, $HOME, $PWD, and /tmp from the host, so
+    sensor reads and CSV writes Just Work without explicit --bind flags.
