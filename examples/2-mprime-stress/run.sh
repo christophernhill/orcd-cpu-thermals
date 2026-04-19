@@ -14,6 +14,7 @@
 #   SAMPLE_INTERVAL  cpu_thermals refresh seconds  (default 0.5)
 #   OUTPUT_DIR       output directory              (default ./results/<ts>)
 #   MPRIME_URL       override the download URL     (default upstream)
+#   DRYRUN           if set to 1, print topology and exit (no mprime)
 #
 # Linux requires `taskset` (util-linux). macOS uses `gtimeout` from
 # coreutils (`brew install coreutils`); Linux already ships `timeout`.
@@ -22,6 +23,7 @@ set -euo pipefail
 
 DURATION="${DURATION:-10}"
 SAMPLE_INTERVAL="${SAMPLE_INTERVAL:-0.5}"
+DRYRUN="${DRYRUN:-0}"
 OUTPUT_DIR="${OUTPUT_DIR:-./results/$(date +%Y%m%d-%H%M%S)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # MPRIME_DIR defaults to a directory next to this script. Override (e.g.
@@ -163,6 +165,32 @@ fi
 SOCKETS="${SOCKETS:-1}"
 
 echo ">> Detected: $SOCKETS socket(s), $TOTAL_CPUS logical CPU(s)"
+
+# ---------------------------------------------------------------- dry run
+#
+# DRYRUN=1 prints the computed topology and planned taskset masks
+# without launching mprime or cpu-thermals.  Useful for auditing on
+# new hardware before committing to a real stress run.
+
+if [[ "$DRYRUN" == "1" ]]; then
+    if [[ -f /proc/cpuinfo ]] && [[ "$SOCKETS" -ge 2 ]]; then
+        for s in $(seq 0 $((SOCKETS - 1))); do
+            all_cpus=$(_cpus_on_socket "$s")
+            phys_cpus=$(_one_per_core_on_socket "$s")
+            n_phys=$(echo "$phys_cpus" | tr , '\n' | wc -l | tr -d ' ')
+            echo ">> socket $s:  taskset mask = $all_cpus"
+            echo "              workers = $n_phys (one per physical core)"
+        done
+    elif [[ -f /proc/cpuinfo ]]; then
+        phys_cpus=$(_one_per_core_on_socket 0)
+        n_phys=$(echo "$phys_cpus" | tr , '\n' | wc -l | tr -d ' ')
+        echo ">> single socket:  workers = $n_phys (one per physical core)"
+    else
+        echo ">> single socket (macOS):  workers = $TOTAL_CPUS"
+    fi
+    echo ">> (dry run — not launching mprime)"
+    exit 0
+fi
 
 # ---------------------------------------------------------------- output
 
