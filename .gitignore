@@ -13,3 +13,9 @@ reviews
 
 # CSV captures (default --csv filename pattern)
 cpu_thermals-*.csv
+
+# Stress-harness output (examples/2-mprime-stress/run.sh's default
+# OUTPUT_DIR is ./results/<timestamp>/ relative to $PWD; if invoked
+# from the repo root this lands here rather than in the per-example
+# .gitignore'd location).
+results/
