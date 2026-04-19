@@ -13,23 +13,29 @@ A succinct project briefing for any AI coding agent (Cursor, Claude Code, Copilo
 3. **CI is a dumb trigger.** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) (15 lines) and [`.gitlab-ci.yml`](../.gitlab-ci.yml) (6 lines) only call `./tests/smoke.sh`. All real test logic lives in the script. This keeps the project portable to any CI provider.
 4. **Stdout vs. stderr discipline.** Stdout carries user-facing output (the TUI table, or the CSV when `--csv -`). Banners, summaries, errors, and the Ctrl-C farewell all go to stderr, never to stdout. The pipe-friendly path (`cpu-thermals --csv - | gzip > log.gz`) depends on this.
 5. **Per-subdirectory READMEs.** Subpackages and example subdirectories all carry a README using a consistent template (`What this shows / Prerequisites / How to run / What you should see / What to look at next`). When you add a new directory, write its README in the same shape.
+6. **All non-trivial work happens on a feature branch and lands via a GitHub PR.** No direct commits to `main`. The branch name uses a short prefix (`feat/`, `fix/`, `docs/`, `chore/`) plus a kebab-case description (e.g. `feat/stats-subcommand`, `fix/install-binary-path`). The PR description follows the repo's sectioned commit-message style and covers Summary / Behaviour / Why this design / Files touched / Testing / Per AGENT_INSTRUCTIONS. The user merges; the agent does not self-merge. Trivial fixes (typo / one-line) may still land directly on `main`; anything matching the "non-trivial" definition further down (feature, interface change, restructuring, > ~30 lines across > 1 file) must use this workflow.
 
 ## Directory layout (orient yourself in 10 seconds)
 
 ```
 cpu_thermals/
-├── cpu_thermals/                    # the package; ~600 lines stdlib-only
-│   ├── cli.py                       # arg parsing + run loop (deliberately thin)
+├── cpu_thermals/                    # the package; ~750 lines stdlib-only
+│   ├── cli.py                       # arg parsing, sub-command dispatch, monitor loop
 │   ├── backends/                    # WHERE temps come from (one file per platform)
 │   │   ├── README.md
 │   │   ├── __init__.py              # TempSource Protocol + detect() dispatcher
 │   │   ├── lm_sensors.py            # Linux (Intel coretemp + AMD k10temp)
 │   │   └── smctemp.py               # macOS Apple Silicon
-│   └── output/                      # WHERE temps go (one file per format)
+│   ├── output/                      # WHERE temps go (one file per format)
+│   │   ├── README.md
+│   │   ├── __init__.py              # Renderer Protocol + MultiRenderer + select()
+│   │   ├── table.py                 # live colored TUI
+│   │   └── csv.py                   # CSV file or stdout (`-` sentinel)
+│   └── stats/                       # POST-PROCESSING (cpu-thermals stats CSVFILE)
 │       ├── README.md
-│       ├── __init__.py              # Renderer Protocol + MultiRenderer + select()
-│       ├── table.py                 # live colored TUI
-│       └── csv.py                   # CSV file or stdout (`-` sentinel)
+│       ├── __init__.py              # argparse + CSV reader + group/summarize + printer
+│       ├── compute.py               # Summary dataclass + summarize() + kurtosis()
+│       └── plot.py                  # render_sparkline() with UTF-8 fallback
 ├── examples/
 │   ├── README.md                    # index of examples
 │   ├── 1-simple-terminal/           # 5 named scripts + apptainer/ subdir
@@ -46,11 +52,12 @@ cpu_thermals/
 
 ## Key abstractions (the only architecture you need to remember)
 
-Two tiny Protocols, two dispatchers, one `MultiRenderer` composite. The whole system fits in a paragraph:
+Two tiny Protocols, two dispatchers, one `MultiRenderer` composite, plus a sub-command dispatch in `cli.py`. The whole system fits in a paragraph:
 
 - **`TempSource`** ([backends/__init__.py](../cpu_thermals/backends/__init__.py)) — `name`, `install_help`, `check()`, `read() -> [Reading]`. One implementation per platform. `detect(name=None)` picks one by `--backend` or `platform.system()`.
 - **`Renderer`** ([output/__init__.py](../cpu_thermals/output/__init__.py)) — `name`, `start(labels)`, `row(readings)`, `stop()`. `select(tui=, csv_path=)` returns either a single renderer or a `MultiRenderer` that fans `start/row/stop` out to several children. Run loop is unaware of how many destinations are active.
 - **`Reading`** — a `NamedTuple(label: str, celsius: float)`. The lingua franca between backends and renderers.
+- **Sub-command dispatch** ([cli.py](../cpu_thermals/cli.py)) — `main()` checks `argv[0]` against the `SUBCOMMANDS` set; if it matches (currently `{"stats"}`), it lazy-imports the sub-package and calls its `run(argv) -> int`. Otherwise the whole argv goes to the legacy monitor parser. Keeps the bare `cpu-thermals 0.5 --csv -` invocation working without forcing users to type `cpu-thermals monitor 0.5 --csv -`.
 
 The CSV schema is fixed and long-format: `timestamp,node,sensor,celsius`. One row per sensor per sample. Identical across all backends so files from heterogeneous machines concatenate cleanly. Do not change to wide format.
 
@@ -80,6 +87,17 @@ The lazy `from .mybackend import ...` pattern in the factory keeps the import gr
 3. Update [`cpu_thermals/output/README.md`](../cpu_thermals/output/README.md) with a row in the "Current renderers" table and (if the destination is non-trivial) a note in the conventions section.
 4. Re-run `./tests/smoke.sh`.
 
+### Adding a new sub-command (e.g. `cpu-thermals foo BAR`)
+
+The pattern was set by `cpu-thermals stats` — copy that shape rather than reinventing.
+
+1. Add the name to `SUBCOMMANDS` in [`cpu_thermals/cli.py`](../cpu_thermals/cli.py).
+2. Add a branch in `_dispatch_subcommand` that lazy-imports your sub-package and calls its `run(argv) -> int`.
+3. Create the new sub-package `cpu_thermals/foo/` mirroring `stats/`: `__init__.py` with the `run(argv)` entry, focused submodules per concern (e.g. `compute.py` / `plot.py` for stats), a per-subdirectory `README.md` following the standard template.
+4. Add a section to [`tests/smoke.sh`](../tests/smoke.sh) exercising the sub-command end-to-end (use `tests/fake_run.py` to produce a CSV if your sub-command needs one).
+5. Add the new lines to the `Sub-commands:` block of cli.py's `EPILOG` so the sub-command is discoverable from `cpu-thermals --help`.
+6. Update this file's Directory layout and Key abstractions sections.
+
 ### Adding a new example
 
 1. Make a new subdirectory under `examples/` (e.g. `4-something/`).
@@ -106,6 +124,55 @@ When asked for a feature with non-obvious design choices, draft a plan (the Curs
 Read [`git log`](../.git/) for the established style. Commit messages here are intentionally long and sectioned (Layout / Design choices / Why X / Smoke tested / etc.) rather than terse. They are the primary way someone reviewing the project six months from now reconstructs *why* a thing looks the way it does. Match that style.
 
 Do not amend or force-push without the user's explicit say-so.
+
+### Branch and PR mechanics
+
+Per non-negotiable #6, all non-trivial work happens on a feature branch and lands via a PR. The literal commands:
+
+```bash
+# Start
+git checkout main
+git pull --ff-only
+git checkout -b feat/<short-kebab-description>     # or fix/, docs/, chore/
+
+# ... implement, run smoke tests, dispatch sub-agent reviews,
+# address comments, re-run smoke ...
+
+# Commit (dense sectioned messages, one logical change per commit)
+git commit -m "$(cat <<'EOF'
+<title line>
+
+<body sections>
+EOF
+)"
+
+# Push and open the PR
+git push -u origin feat/<short-kebab-description>
+gh pr create --title "<title>" --body "$(cat <<'EOF'
+## Summary
+<bullets>
+
+## Behaviour
+<output snippets>
+
+## Why this design
+<key tradeoffs>
+
+## Files touched
+<categorised list>
+
+## Testing
+<smoke results, manual verifications>
+
+## Per AGENT_INSTRUCTIONS
+<reviews dispatched, READMEs walked, AGENT_INSTRUCTIONS updates>
+EOF
+)"
+```
+
+The agent prints the PR URL on completion and stops there. The user reviews and merges; do not self-merge.
+
+Trivial changes (typo fixes, one-line bug fixes, README touch-ups that don't change behaviour) may still land directly on `main`, but anything matching the "non-trivial change" definition in the *Responsibilities on non-trivial changes* section below (feature, interface change, restructuring, > ~30 lines across > 1 file) must use this workflow.
 
 ### When in doubt, look at how the existing code does it
 
@@ -163,7 +230,8 @@ These are concrete patterns the codebase has settled into, often as fixes to spe
 - **Don't swallow exit codes; allowlist the expected ones.** `examples/2-mprime-stress/run.sh`'s `phase()` function captures the underlying command's exit code, treats `0/124/137/143` as expected (clean exit + the various `timeout`-killed cases), and surfaces every other non-zero exit on stderr with a `!! Phase 'X' FAILED` line plus the failing command. The previous `... || true` pattern hid bad `taskset` masks, missing exec bits, and broken stressors. New scripts that wrap external commands should follow the same exit-code-allowlist pattern.
 - **Resolve external paths at install time, don't trust the build-time default.** `examples/3-systemd-csv-rotation/install.sh` runs `command -v cpu-thermals` and `sed`s the actual path into the unit's `ExecStart=` before installing, so the service starts correctly whether the binary lives at `/usr/local/bin/`, `/usr/bin/`, `~/.local/bin/`, or a venv path. Never let an installer run `command -v X` as a precheck and then deploy a config that hardcodes a different `X` path.
 - **Bound systemd restart loops.** Units pair `Restart=on-failure` with `StartLimitBurst=5` / `StartLimitIntervalSec=60` so a permanently broken config (wrong binary path, missing kernel module, etc.) marks the unit failed instead of looping forever and flooding the journal. `Restart=always` plus no limits is the wrong default for a monitor that must be safe to deploy by an unfamiliar admin.
-- **Never assume UTF-8 stdout.** The TUI renderer probes `sys.stdout.encoding` at import time and falls back from U+2588 / U+00B0 to plain `#` / ` C` on non-UTF-8 terminals (minimal server shells, serial consoles, `LANG=C`). Output destined for arbitrary terminals should make the same check.
+- **Never assume UTF-8 stdout.** The TUI renderer probes `sys.stdout.encoding` at import time and falls back from U+2588 / U+00B0 to plain `#` / ` C` on non-UTF-8 terminals (minimal server shells, serial consoles, `LANG=C`). Output destined for arbitrary terminals should make the same check. The stats sub-package's sparkline renderer reuses the same predicate (`from ..output.table import _supports_utf8`) rather than re-implementing it.
+- **Sub-commands are dispatched by argv[0] inspection, not via argparse subparsers.** This keeps the legacy positional `interval` arg (`cpu-thermals 0.5 --csv -`) working without forcing users to type `cpu-thermals monitor 0.5 --csv -`. New sub-commands must register their name in the `SUBCOMMANDS` set in [`cpu_thermals/cli.py`](../cpu_thermals/cli.py) and ship a sub-package with a `run(argv) -> int` entry point. See the "Adding a new sub-command" recipe above.
 
 ## What to read first
 
