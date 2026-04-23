@@ -5,6 +5,6 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE/../../.."   # repo root
-exec apptainer build --force \
+exec apptainer build --force --fakeroot \
     "$HERE/cpu_thermals.sif" \
     "$HERE/cpu_thermals.def"

@@ -6,4 +6,4 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 [[ -f "$HERE/mprime-stress.sif" ]] \
     || { echo "build first: $HERE/build.sh" >&2; exit 1; }
-exec apptainer run "$HERE/mprime-stress.sif" "$@"
+exec apptainer run --no-mount /etc/localtime "$HERE/mprime-stress.sif" "$@"

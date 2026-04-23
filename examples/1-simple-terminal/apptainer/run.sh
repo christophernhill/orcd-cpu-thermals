@@ -6,4 +6,4 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 [[ -f "$HERE/cpu_thermals.sif" ]] \
     || { echo "build first: $HERE/build.sh" >&2; exit 1; }
-exec apptainer run "$HERE/cpu_thermals.sif" "$@"
+exec apptainer run --no-mount /etc/localtime "$HERE/cpu_thermals.sif" "$@"

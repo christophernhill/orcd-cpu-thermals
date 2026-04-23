@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: alpine:3.19
+From: debian:bookworm-slim
 
 %files
     cpu_thermals /opt/cpu_thermals/cpu_thermals
@@ -7,9 +7,9 @@ From: alpine:3.19
     README.md /opt/cpu_thermals/README.md
 
 %post
-    apk add --no-cache python3 py3-pip lm-sensors
+    apt-get update && apt-get install -y --no-install-recommends python3 python3-pip lm-sensors
     cd /opt/cpu_thermals
-    # --break-system-packages because Alpine's Python is marked PEP 668
+    # --break-system-packages because Alpines Python is marked PEP 668
     # externally-managed; this is the standard pattern for installing a
     # single first-party package into a container.
     python3 -m pip install --no-cache-dir --break-system-packages .
